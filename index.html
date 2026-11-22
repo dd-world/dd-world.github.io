@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>🐾 댕댕 월드 (DaengDaeng World)</title>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; height: 100dvh; overflow: hidden; background: #1e2430; font-family: 'Malgun Gothic', 'Hiragino Sans', sans-serif; color: #fff9ec; }
+    #game-frame { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: none; }
+    #status { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 20px; }
+    .box { background: #2a3242; border: 2px solid #d4a373; border-radius: 16px; padding: 26px 22px; max-width: 360px; }
+    h1 { margin: 0 0 10px; color: #fbbf24; font-size: 24px; }
+    p { margin: 0; font-size: 14px; line-height: 1.6; color: #e2e8f0; }
+    button { margin-top: 14px; padding: 10px 20px; border: 0; border-radius: 10px; background: #f59e0b; color: #fff; font-weight: 700; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div id="status">
+    <div class="box">
+      <h1>🐾 댕댕 월드</h1>
+      <p id="msg">게임 서버에 연결하는 중입니다...</p>
+      <button id="retry-btn" style="display:none" onclick="location.reload()">다시 시도</button>
+    </div>
+  </div>
+  <iframe id="game-frame" allow="fullscreen; autoplay"></iframe>
+
+  <script>
+    // =========================================================================
+    // 여기에 본인의 GitHub Gist ID 를 한 번만 입력하세요!
+    // (예: https://gist.github.com/아이디/abcdef123456... 에서 맨 뒤 영문+숫자 ID)
+    // =========================================================================
+    var GIST_ID = 'gist:c11d893682602dbc956c7b172e95ba95';
+
+    (function () {
+      var frame = document.getElementById('game-frame');
+      var statusEl = document.getElementById('status');
+      var msgEl = document.getElementById('msg');
+      var retryBtn = document.getElementById('retry-btn');
+
+      // 자동 로그인 & 한국어/일본어 설정을 GitHub Pages 도메인에 영구 저장
+      window.addEventListener('message', function (ev) {
+        var data = ev.data || {};
+        if (data.type === 'dd_request_storage') {
+          try {
+            frame.contentWindow.postMessage({
+              type: 'dd_storage_data',
+              autoLogin: localStorage.getItem('dd_auto_login_v1'),
+              lang: localStorage.getItem('dd_lang')
+            }, '*');
+          } catch (e) {}
+        } else if (data.type === 'dd_save_storage') {
+          try {
+            if (data.autoLogin === null) localStorage.removeItem('dd_auto_login_v1');
+            else if (typeof data.autoLogin === 'string') localStorage.setItem('dd_auto_login_v1', data.autoLogin);
+            if (typeof data.lang === 'string') localStorage.setItem('dd_lang', data.lang);
+          } catch (e) {}
+        }
+      });
+
+      if (!GIST_ID || GIST_ID === 'gist:c11d893682602dbc956c7b172e95ba95') {
+        msgEl.textContent = 'index.html 파일의 GIST_ID를 먼저 입력해 주세요!';
+        return;
+      }
+
+      fetch('https://api.github.com/gists/' + encodeURIComponent(GIST_ID) + '?t=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { return r.json(); })
+        .then(function (gist) {
+          var file = gist && gist.files && gist.files['url.txt'];
+          var url = file && file.content ? file.content.trim() : '';
+          if (url && /^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/i.test(url)) {
+            frame.src = url;
+            frame.style.display = 'block';
+            statusEl.style.display = 'none';
+          } else {
+            msgEl.textContent = '현재 게임 서버가 열려 있지 않습니다. 잠시 후 다시 시도해 주세요!';
+            retryBtn.style.display = 'inline-block';
+          }
+        })
+        .catch(function () {
+          msgEl.textContent = '서버 주소를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요!';
+          retryBtn.style.display = 'inline-block';
+        });
+    })();
+  </script>
+</body>
+</html>
