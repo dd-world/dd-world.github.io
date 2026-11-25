@@ -117,6 +117,7 @@
       var errEl = document.getElementById('off-err');
       var isOnline = null;
       var activeUrl = '';
+      var apiBlockedUntil = 0;
 
       var I = {
         ko: {
@@ -145,7 +146,8 @@
         }
       };
 
-      var lang = localStorage.getItem('dd_lang') || 'ko';
+      var lang = 'ko';
+      try { lang = localStorage.getItem('dd_lang') || 'ko'; } catch (e) {}
       if (!I[lang]) lang = 'ko';
 
       function applyLang() {
@@ -212,31 +214,35 @@
         }
       });
 
-      // CORS 제한에 걸리지 않는 이미지 핑으로 서버 생존 여부 즉시 확인
+      // 이미지 핑 + /api/status 병렬 체크 (PC 방화벽/지연 환경 대응 7초 타임아웃)
       function pingServerUrl(url, cb) {
         var done = false;
-        var img = new Image();
+        var failedCount = 0;
+        function finish(ok) {
+          if (done) return;
+          if (!ok) {
+            failedCount++;
+            if (failedCount < 2) return;
+          }
+          done = true;
+          clearTimeout(timer);
+          cb(ok);
+        }
         var timer = setTimeout(function () {
           if (done) return;
           done = true;
           cb(false);
-        }, 3500);
-        img.onload = function () {
-          if (done) return;
-          done = true;
-          clearTimeout(timer);
-          cb(true);
-        };
-        img.onerror = function () {
-          if (done) return;
-          done = true;
-          clearTimeout(timer);
-          cb(false);
-        };
-        img.src = url + '/assets/gold_coin.png?ping=' + Date.now();
-      }
+        }, 7000);
 
-      var lastGistFetchAt = 0;
+        var img = new Image();
+        img.onload = function () { finish(true); };
+        img.onerror = function () { finish(false); };
+        img.src = url + '/assets/gold_coin.png?ping=' + Date.now();
+
+        fetch(url + '/api/status?t=' + Date.now(), { cache: 'no-store' })
+          .then(function (r) { finish(Boolean(r && r.ok)); })
+          .catch(function () { finish(false); });
+      }
 
       function tryConnectUrl(url) {
         if (!url || !/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/i.test(url)) {
@@ -247,6 +253,7 @@
           if (ok) {
             isOnline = true;
             activeUrl = url;
+            try { localStorage.setItem('dd_last_srv_url', url); } catch (e) {}
             renderBadge();
             errEl.textContent = '';
             frame.src = url;
@@ -258,30 +265,62 @@
         });
       }
 
-      // 실시간 지연 없는 api.github.com에서 최신 주소를 가져오고(초기 1회 + OFF 상태일 때 30초마다 갱신),
-      // 5초마다는 확보된 서버 주소에 이미지 핑만 보내 API 제한 없이 즉시 ON/OFF 전환!
-      function checkLiveServer(forceGist) {
-        if (frame.style.display === 'block') return;
-        var now = Date.now();
-        if (!forceGist && activeUrl && (now - lastGistFetchAt < 30000)) {
-          tryConnectUrl(activeUrl);
-          return;
-        }
-        lastGistFetchAt = now;
-        fetch('https://api.github.com/gists/' + encodeURIComponent(GIST_ID) + '?t=' + now, { cache: 'no-store' })
-          .then(function (r) {
-            if (!r.ok) throw new Error('api ' + r.status);
-            return r.json();
-          })
-          .then(function (gist) {
-            var file = gist && gist.files && gist.files['url.txt'];
-            var url = file && file.content ? file.content.trim() : '';
-            activeUrl = url;
-            tryConnectUrl(url);
+      // 1순위: api.github.com (실시간 지연 없음)
+      // 2순위(PC 등에서 시간당 60회 제한 403 발생 시 자동 우회): gist.githubusercontent.com raw (무제한!)
+      function fetchFromRawGist(now) {
+        var owner = 'anonymous';
+        try { owner = localStorage.getItem('dd_gist_owner_' + GIST_ID) || 'anonymous'; } catch (e) {}
+        var rawUrl = 'https://gist.githubusercontent.com/' + encodeURIComponent(owner) + '/' + encodeURIComponent(GIST_ID) + '/raw/url.txt?t=' + now;
+        return fetch(rawUrl, { cache: 'no-store' })
+          .then(function (r) { if (!r.ok) throw new Error('raw ' + r.status); return r.text(); })
+          .then(function (txt) {
+            var url = String(txt || '').trim();
+            if (url) activeUrl = url;
+            tryConnectUrl(activeUrl);
           })
           .catch(function () {
             if (activeUrl) tryConnectUrl(activeUrl);
             else { isOnline = false; renderBadge(); }
+          });
+      }
+
+      var lastGistFetchAt = 0;
+
+      function checkLiveServer(forceGist) {
+        if (frame.style.display === 'block') return;
+        var now = Date.now();
+        if (!activeUrl) {
+          try { activeUrl = localStorage.getItem('dd_last_srv_url') || ''; } catch (e) {}
+        }
+        if (!forceGist && activeUrl && (now - lastGistFetchAt < 45000)) {
+          tryConnectUrl(activeUrl);
+          return;
+        }
+        lastGistFetchAt = now;
+        if (now < apiBlockedUntil) {
+          fetchFromRawGist(now);
+          return;
+        }
+        fetch('https://api.github.com/gists/' + encodeURIComponent(GIST_ID) + '?t=' + now, { cache: 'no-store' })
+          .then(function (r) {
+            if (r.status === 403 || r.status === 429) {
+              apiBlockedUntil = Date.now() + 10 * 60 * 1000;
+              throw new Error('rate_limit');
+            }
+            if (!r.ok) throw new Error('api ' + r.status);
+            return r.json();
+          })
+          .then(function (gist) {
+            if (gist && gist.owner && gist.owner.login) {
+              try { localStorage.setItem('dd_gist_owner_' + GIST_ID, gist.owner.login); } catch (e) {}
+            }
+            var file = gist && gist.files && gist.files['url.txt'];
+            var url = file && file.content ? file.content.trim() : '';
+            if (url) activeUrl = url;
+            tryConnectUrl(activeUrl);
+          })
+          .catch(function () {
+            fetchFromRawGist(now);
           });
       }
 
