@@ -236,6 +236,116 @@
         img.src = url + '/assets/gold_coin.png?ping=' + Date.now();
       }
 
+      var lastGistFetchAt = 0;
+
+      function tryConnectUrl(url) {
+        if (!url || !/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/i.test(url)) {
+          isOnline = false; activeUrl = ''; renderBadge();
+          return;
+        }
+        pingServerUrl(url, function (ok) {
+          if (ok) {
+            isOnline = true;
+            activeUrl = url;
+            renderBadge();
+            errEl.textContent = '';
+            frame.src = url;
+            frame.style.display = 'block';
+            shell.style.display = 'none';
+          } else {
+            isOnline = false; renderBadge();
+          }
+        });
+      }
+
+      // 실시간 지연 없는 api.github.com에서 최신 주소를 가져오고(초기 1회 + OFF 상태일 때 30초마다 갱신),
+      // 5초마다는 확보된 서버 주소에 이미지 핑만 보내 API 제한 없이 즉시 ON/OFF 전환!
+      function checkLiveServer(forceGist) {
+        if (frame.style.display === 'block') return;
+        var now = Date.now();
+        if (!forceGist && activeUrl && (now - lastGistFetchAt < 30000)) {
+          tryConnectUrl(activeUrl);
+          return;
+        }
+        lastGistFetchAt = now;
+        fetch('https://api.github.com/gists/' + encodeURIComponent(GIST_ID) + '?t=' + now, { cache: 'no-store' })
+          .then(function (r) {
+            if (!r.ok) throw new Error('api ' + r.status);
+            return r.json();
+          })
+          .then(function (gist) {
+            var file = gist && gist.files && gist.files['url.txt'];
+            var url = file && file.content ? file.content.trim() : '';
+            activeUrl = url;
+            tryConnectUrl(url);
+          })
+          .catch(function () {
+            if (activeUrl) tryConnectUrl(activeUrl);
+            else { isOnline = false; renderBadge(); }
+          });
+      }
+
+      applyLang();
+        };
+      });
+
+      function onOfflineAction() {
+        var d = I[lang];
+        if (isOnline === true && activeUrl) {
+          frame.src = activeUrl;
+          frame.style.display = 'block';
+          shell.style.display = 'none';
+          return;
+        }
+        errEl.textContent = (isOnline === false) ? d.offMsg : d.chkMsg;
+      }
+      document.getElementById('off-login').onclick = onOfflineAction;
+      document.getElementById('off-create').onclick = onOfflineAction;
+
+      // 자동 로그인 & 언어 설정 영구 저장 브리지
+      window.addEventListener('message', function (ev) {
+        var data = ev.data || {};
+        if (data.type === 'dd_request_storage') {
+          try {
+            frame.contentWindow.postMessage({
+              type: 'dd_storage_data',
+              autoLogin: localStorage.getItem('dd_auto_login_v1'),
+              lang: localStorage.getItem('dd_lang')
+            }, '*');
+          } catch (e) {}
+        } else if (data.type === 'dd_save_storage') {
+          try {
+            if (data.autoLogin === null) localStorage.removeItem('dd_auto_login_v1');
+            else if (typeof data.autoLogin === 'string') localStorage.setItem('dd_auto_login_v1', data.autoLogin);
+            if (typeof data.lang === 'string') localStorage.setItem('dd_lang', data.lang);
+          } catch (e) {}
+        }
+      });
+
+      // CORS 제한에 절대 안 걸리는 이미지 응답 핑으로 서버 생존 여부 즉시 확인!
+      function pingServerUrl(url, cb) {
+        var done = false;
+        var img = new Image();
+        var timer = setTimeout(function () {
+          if (done) return;
+          done = true;
+          cb(false);
+        }, 3500);
+        img.onload = function () {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          cb(true);
+        };
+        img.onerror = function () {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          cb(false);
+        };
+        img.src = url + '/assets/gold_coin.png?ping=' + Date.now();
+      }
+
       var cachedOwner = localStorage.getItem('dd_gist_owner_' + GIST_ID) || '';
 
       function handleUrlText(rawText) {
@@ -287,8 +397,8 @@
       }
 
       applyLang();
-      checkLiveServer();
-      setInterval(checkLiveServer, 5000);
+      checkLiveServer(true);
+      setInterval(function () { checkLiveServer(false); }, 5000);
     })();
   </script>
 </body>
