@@ -212,6 +212,30 @@
         }
       });
 
+      // CORS 제한에 절대 안 걸리는 이미지 응답 핑으로 서버 생존 여부 즉시 확인!
+      function pingServerUrl(url, cb) {
+        var done = false;
+        var img = new Image();
+        var timer = setTimeout(function () {
+          if (done) return;
+          done = true;
+          cb(false);
+        }, 3500);
+        img.onload = function () {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          cb(true);
+        };
+        img.onerror = function () {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          cb(false);
+        };
+        img.src = url + '/assets/gold_coin.png?ping=' + Date.now();
+      }
+
       function checkLiveServer() {
         if (frame.style.display === 'block') return;
         fetch('https://api.github.com/gists/' + encodeURIComponent(GIST_ID) + '?t=' + Date.now(), { cache: 'no-store' })
@@ -223,27 +247,19 @@
               isOnline = false; activeUrl = ''; renderBadge();
               return;
             }
-            var ctrl = new AbortController();
-            var tid = setTimeout(function () { ctrl.abort(); }, 3500);
-            return fetch(url + '/api/status?t=' + Date.now(), { cache: 'no-store', mode: 'cors', signal: ctrl.signal })
-              .then(function (sr) {
-                clearTimeout(tid);
-                if (sr && sr.ok) {
-                  isOnline = true;
-                  activeUrl = url;
-                  renderBadge();
-                  errEl.textContent = '';
-                  frame.src = url;
-                  frame.style.display = 'block';
-                  shell.style.display = 'none';
-                } else {
-                  isOnline = false; activeUrl = ''; renderBadge();
-                }
-              })
-              .catch(function () {
-                clearTimeout(tid);
+            pingServerUrl(url, function (ok) {
+              if (ok) {
+                isOnline = true;
+                activeUrl = url;
+                renderBadge();
+                errEl.textContent = '';
+                frame.src = url;
+                frame.style.display = 'block';
+                shell.style.display = 'none';
+              } else {
                 isOnline = false; activeUrl = ''; renderBadge();
-              });
+              }
+            });
           })
           .catch(function () {
             isOnline = false; activeUrl = ''; renderBadge();
@@ -252,7 +268,7 @@
 
       applyLang();
       checkLiveServer();
-      setInterval(checkLiveServer, 8000);
+      setInterval(checkLiveServer, 5000);
     })();
   </script>
 </body>
