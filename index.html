@@ -236,30 +236,50 @@
         img.src = url + '/assets/gold_coin.png?ping=' + Date.now();
       }
 
+      var cachedOwner = localStorage.getItem('dd_gist_owner_' + GIST_ID) || '';
+
+      function handleUrlText(rawText) {
+        var url = String(rawText || '').trim();
+        if (!url || !/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/i.test(url)) {
+          isOnline = false; activeUrl = ''; renderBadge();
+          return;
+        }
+        pingServerUrl(url, function (ok) {
+          if (ok) {
+            isOnline = true;
+            activeUrl = url;
+            renderBadge();
+            errEl.textContent = '';
+            frame.src = url;
+            frame.style.display = 'block';
+            shell.style.display = 'none';
+          } else {
+            isOnline = false; activeUrl = ''; renderBadge();
+          }
+        });
+      }
+
+      // 최초 1회만 GitHub API로 Gist 소유자 아이디를 자동 파악해 저장한 뒤,
+      // 이후 5초마다 시간당 60회 제한이 없는 gist.githubusercontent.com raw 주소로 무제한 체크!
       function checkLiveServer() {
         if (frame.style.display === 'block') return;
+        if (cachedOwner) {
+          var rawUrl = 'https://gist.githubusercontent.com/' + encodeURIComponent(cachedOwner) + '/' + encodeURIComponent(GIST_ID) + '/raw/url.txt?t=' + Date.now();
+          fetch(rawUrl, { cache: 'no-store' })
+            .then(function (r) { if (!r.ok) throw new Error('raw fail'); return r.text(); })
+            .then(handleUrlText)
+            .catch(function () { isOnline = false; activeUrl = ''; renderBadge(); });
+          return;
+        }
         fetch('https://api.github.com/gists/' + encodeURIComponent(GIST_ID) + '?t=' + Date.now(), { cache: 'no-store' })
           .then(function (r) { return r.json(); })
           .then(function (gist) {
-            var file = gist && gist.files && gist.files['url.txt'];
-            var url = file && file.content ? file.content.trim() : '';
-            if (!url || !/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/i.test(url)) {
-              isOnline = false; activeUrl = ''; renderBadge();
-              return;
+            if (gist && gist.owner && gist.owner.login) {
+              cachedOwner = gist.owner.login;
+              try { localStorage.setItem('dd_gist_owner_' + GIST_ID, cachedOwner); } catch (e) {}
             }
-            pingServerUrl(url, function (ok) {
-              if (ok) {
-                isOnline = true;
-                activeUrl = url;
-                renderBadge();
-                errEl.textContent = '';
-                frame.src = url;
-                frame.style.display = 'block';
-                shell.style.display = 'none';
-              } else {
-                isOnline = false; activeUrl = ''; renderBadge();
-              }
-            });
+            var file = gist && gist.files && gist.files['url.txt'];
+            handleUrlText(file && file.content ? file.content : '');
           })
           .catch(function () {
             isOnline = false; activeUrl = ''; renderBadge();
