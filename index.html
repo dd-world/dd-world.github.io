@@ -5,39 +5,194 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>🐾 댕댕 월드 (DaengDaeng World)</title>
   <style>
-    html, body { margin: 0; padding: 0; width: 100%; height: 100%; height: 100dvh; overflow: hidden; background: #1e2430; font-family: 'Malgun Gothic', 'Hiragino Sans', sans-serif; color: #fff9ec; }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%; height: 100dvh;
+      overflow: hidden; background: #16141f;
+      font-family: 'Malgun Gothic', 'Hiragino Sans', 'Meiryo', monospace; color: #3b2314;
+    }
     #game-frame { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: none; }
-    #status { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 20px; }
-    .box { background: #2a3242; border: 2px solid #d4a373; border-radius: 16px; padding: 26px 22px; max-width: 360px; }
-    h1 { margin: 0 0 10px; color: #fbbf24; font-size: 24px; }
-    p { margin: 0; font-size: 14px; line-height: 1.6; color: #e2e8f0; }
-    button { margin-top: 14px; padding: 10px 20px; border: 0; border-radius: 10px; background: #f59e0b; color: #fff; font-weight: 700; cursor: pointer; }
+    .overlay {
+      position: fixed; inset: 0; background: rgba(14, 12, 24, 0.78);
+      display: flex; align-items: center; justify-content: center; padding: 12px; z-index: 40;
+    }
+    .card {
+      background: linear-gradient(180deg, #fffdf4 0%, #f8ebd0 100%);
+      border: 3px solid #3d2111; outline: 2px solid #d99b52; outline-offset: -5px;
+      border-radius: 8px; padding: 18px; width: 100%; max-width: 430px;
+      box-shadow: 0 6px 0 #26140a, 0 10px 24px rgba(0,0,0,0.55);
+      text-align: center; display: flex; flex-direction: column; gap: 9px;
+    }
+    .login-topbar { display: flex; justify-content: space-between; align-items: center; gap: 6px; width: 100%; }
+    .lang-quick { display: flex; gap: 5px; }
+    .lang-chip {
+      border: 2px solid #3d2111; background: linear-gradient(180deg, #fff 0%, #f3e4c8 100%);
+      color: #3d2111; border-radius: 5px; padding: 4px 9px; font-size: 11px; font-weight: 800;
+      cursor: pointer; box-shadow: 0 2px 0 #3d2111;
+    }
+    .lang-chip.active { background: linear-gradient(180deg, #fef08a 0%, #f59e0b 100%); }
+    .server-status-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: linear-gradient(180deg, #fff 0%, #f3e4c8 100%);
+      border: 2px solid #3d2111; border-radius: 999px;
+      padding: 4px 10px; font-size: 11.5px; font-weight: 900; color: #3b2314;
+      box-shadow: 0 2px 0 #3d2111; white-space: nowrap;
+    }
+    .srv-dot { width: 10px; height: 10px; border-radius: 50%; background: #9ca3af; border: 1.5px solid #3d2111; display: inline-block; }
+    .server-status-badge.online .srv-dot { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+    .server-status-badge.offline .srv-dot { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+    .server-status-badge.online { color: #15803d; }
+    .server-status-badge.offline { color: #dc2626; }
+    h1 { margin: 0; font-size: 24px; color: #9a3412; text-shadow: 1px 1px 0 #fde68a; }
+    .sub { margin: 0; font-size: 13px; color: #7c5234; font-weight: 700; }
+    .login-form { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+    .login-form input[type="text"], .login-form input[type="password"] {
+      width: 100%; padding: 10px 12px; border: 2px solid #5c3317; border-radius: 5px;
+      font-size: 14px; outline: none; background: #fffdf7;
+      box-shadow: inset 0 2px 3px rgba(61,33,17,0.12);
+    }
+    .auto-login-row {
+      display: flex; align-items: center; gap: 7px; justify-content: flex-start;
+      font-size: 13px; font-weight: 800; color: #5c3317; cursor: pointer;
+    }
+    .auto-login-row input[type="checkbox"] { width: 17px; height: 17px; accent-color: #ea580c; margin: 0; }
+    .login-btn-row { display: grid; grid-template-columns: 1.35fr 1fr; gap: 8px; width: 100%; }
+    .btn-primary {
+      padding: 12px; border: 2px solid #3d2111; border-radius: 6px;
+      background: linear-gradient(180deg, #fbbf24 0%, #ea580c 100%);
+      color: #fff; font-size: 16px; font-weight: 900; cursor: pointer;
+      text-shadow: 1px 1px 0 #7c2d12; box-shadow: 0 3px 0 #3d2111;
+    }
+    .btn-secondary {
+      padding: 12px 8px; border: 2px solid #3d2111; border-radius: 6px;
+      background: linear-gradient(180deg, #fffdf5 0%, #f3dfb9 100%);
+      color: #5c3317; font-size: 14px; font-weight: 900; cursor: pointer;
+      box-shadow: 0 3px 0 #3d2111;
+    }
+    .err { color: #dc2626; font-size: 13px; min-height: 18px; font-weight: 800; }
   </style>
 </head>
 <body>
-  <div id="status">
-    <div class="box">
-      <h1>🐾 댕댕 월드</h1>
-      <p id="msg">게임 서버에 연결하는 중입니다...</p>
-      <button id="retry-btn" style="display:none" onclick="location.reload()">다시 시도</button>
+  <div id="offline-shell" class="overlay">
+    <div class="card">
+      <div class="login-topbar">
+        <div id="srv-badge" class="server-status-badge">
+          <span class="srv-dot"></span>
+          <span id="srv-txt">서버 확인 중...</span>
+        </div>
+        <div class="lang-quick">
+          <button type="button" class="lang-chip" data-lang="ko">🇰🇷 한국어</button>
+          <button type="button" class="lang-chip" data-lang="ja">🇯🇵 日本語</button>
+          <button type="button" class="lang-chip" data-lang="en">🇺🇸 English</button>
+        </div>
+      </div>
+      <h1 id="t-title">🐾 댕댕 월드</h1>
+      <div class="login-form">
+        <p id="t-sub" class="sub">아이디와 비밀번호를 입력하세요</p>
+        <input id="off-user" type="text" placeholder="아이디" maxlength="16" />
+        <input id="off-pass" type="password" placeholder="비밀번호" maxlength="20" />
+        <label class="auto-login-row">
+          <input type="checkbox" id="off-auto" />
+          <span id="t-auto">자동 로그인</span>
+        </label>
+        <div class="login-btn-row">
+          <button id="off-login" type="button" class="btn-primary">접속하기</button>
+          <button id="off-create" type="button" class="btn-secondary">✨ 계정 생성</button>
+        </div>
+        <div id="off-err" class="err"></div>
+      </div>
     </div>
   </div>
+
   <iframe id="game-frame" allow="fullscreen; autoplay"></iframe>
 
   <script>
-    // =========================================================================
-    // 여기에 본인의 GitHub Gist ID 를 한 번만 입력하세요!
-    // (예: https://gist.github.com/아이디/abcdef123456... 에서 맨 뒤 영문+숫자 ID)
-    // =========================================================================
     var GIST_ID = 'c11d893682602dbc956c7b172e95ba95';
 
     (function () {
       var frame = document.getElementById('game-frame');
-      var statusEl = document.getElementById('status');
-      var msgEl = document.getElementById('msg');
-      var retryBtn = document.getElementById('retry-btn');
+      var shell = document.getElementById('offline-shell');
+      var badge = document.getElementById('srv-badge');
+      var srvTxt = document.getElementById('srv-txt');
+      var errEl = document.getElementById('off-err');
+      var isOnline = null;
+      var activeUrl = '';
 
-      // 자동 로그인 & 한국어/일본어 설정을 GitHub Pages 도메인에 영구 저장
+      var I = {
+        ko: {
+          title: '🐾 댕댕 월드', sub: '아이디와 비밀번호를 입력하세요',
+          user: '아이디', pass: '비밀번호', auto: '자동 로그인',
+          login: '접속하기', create: '✨ 계정 생성',
+          chk: '서버 확인 중...', on: '서버 ON', off: '서버 OFF',
+          offMsg: '🔴 현재 서버 OFF 상태라 접속·계정 생성을 할 수 없습니다.',
+          chkMsg: '⏳ 서버 상태를 확인하고 있습니다. 잠시만 기다려 주세요...'
+        },
+        ja: {
+          title: '🐾 ワンワンワールド', sub: 'IDとパスワードを入力してください',
+          user: 'ID', pass: 'パスワード', auto: '自動ログイン',
+          login: 'ログイン', create: '✨ アカウント作成',
+          chk: 'サーバー確認中...', on: 'サーバー ON', off: 'サーバー OFF',
+          offMsg: '🔴 現在サーバーOFF状態のためログイン・アカウント作成ができません。',
+          chkMsg: '⏳ サーバー状態を確認しています...'
+        },
+        en: {
+          title: '🐾 DaengDaeng World', sub: 'Enter your ID and password',
+          user: 'Username', pass: 'Password', auto: 'Auto Login',
+          login: 'Connect', create: '✨ Create Account',
+          chk: 'Checking...', on: 'Server ON', off: 'Server OFF',
+          offMsg: '🔴 Server is currently OFF. Cannot log in or create an account.',
+          chkMsg: '⏳ Checking server status...'
+        }
+      };
+
+      var lang = localStorage.getItem('dd_lang') || 'ko';
+      if (!I[lang]) lang = 'ko';
+
+      function applyLang() {
+        var d = I[lang];
+        document.getElementById('t-title').textContent = d.title;
+        document.getElementById('t-sub').textContent = d.sub;
+        document.getElementById('off-user').placeholder = d.user;
+        document.getElementById('off-pass').placeholder = d.pass;
+        document.getElementById('t-auto').textContent = d.auto;
+        document.getElementById('off-login').textContent = d.login;
+        document.getElementById('off-create').textContent = d.create;
+        document.querySelectorAll('.lang-chip').forEach(function (b) {
+          b.classList.toggle('active', b.getAttribute('data-lang') === lang);
+        });
+        renderBadge();
+      }
+
+      function renderBadge() {
+        var d = I[lang];
+        badge.classList.remove('online', 'offline');
+        if (isOnline === true) { badge.classList.add('online'); srvTxt.textContent = d.on; }
+        else if (isOnline === false) { badge.classList.add('offline'); srvTxt.textContent = d.off; }
+        else { srvTxt.textContent = d.chk; }
+      }
+
+      document.querySelectorAll('.lang-chip').forEach(function (b) {
+        b.onclick = function () {
+          lang = b.getAttribute('data-lang') || 'ko';
+          try { localStorage.setItem('dd_lang', lang); } catch (e) {}
+          applyLang();
+        };
+      });
+
+      function onOfflineAction() {
+        var d = I[lang];
+        if (isOnline === true && activeUrl) {
+          frame.src = activeUrl;
+          frame.style.display = 'block';
+          shell.style.display = 'none';
+          return;
+        }
+        errEl.textContent = (isOnline === false) ? d.offMsg : d.chkMsg;
+      }
+      document.getElementById('off-login').onclick = onOfflineAction;
+      document.getElementById('off-create').onclick = onOfflineAction;
+
+      // 자동 로그인 & 언어 설정 영구 저장 브리지
       window.addEventListener('message', function (ev) {
         var data = ev.data || {};
         if (data.type === 'dd_request_storage') {
@@ -57,29 +212,47 @@
         }
       });
 
-      if (!GIST_ID) {
-        msgEl.textContent = 'index.html 파일의 GIST_ID를 먼저 입력해 주세요!';
-        return;
+      function checkLiveServer() {
+        if (frame.style.display === 'block') return;
+        fetch('https://api.github.com/gists/' + encodeURIComponent(GIST_ID) + '?t=' + Date.now(), { cache: 'no-store' })
+          .then(function (r) { return r.json(); })
+          .then(function (gist) {
+            var file = gist && gist.files && gist.files['url.txt'];
+            var url = file && file.content ? file.content.trim() : '';
+            if (!url || !/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/i.test(url)) {
+              isOnline = false; activeUrl = ''; renderBadge();
+              return;
+            }
+            var ctrl = new AbortController();
+            var tid = setTimeout(function () { ctrl.abort(); }, 3500);
+            return fetch(url + '/api/status?t=' + Date.now(), { cache: 'no-store', mode: 'cors', signal: ctrl.signal })
+              .then(function (sr) {
+                clearTimeout(tid);
+                if (sr && sr.ok) {
+                  isOnline = true;
+                  activeUrl = url;
+                  renderBadge();
+                  errEl.textContent = '';
+                  frame.src = url;
+                  frame.style.display = 'block';
+                  shell.style.display = 'none';
+                } else {
+                  isOnline = false; activeUrl = ''; renderBadge();
+                }
+              })
+              .catch(function () {
+                clearTimeout(tid);
+                isOnline = false; activeUrl = ''; renderBadge();
+              });
+          })
+          .catch(function () {
+            isOnline = false; activeUrl = ''; renderBadge();
+          });
       }
 
-      fetch('https://api.github.com/gists/' + encodeURIComponent(GIST_ID) + '?t=' + Date.now(), { cache: 'no-store' })
-        .then(function (r) { return r.json(); })
-        .then(function (gist) {
-          var file = gist && gist.files && gist.files['url.txt'];
-          var url = file && file.content ? file.content.trim() : '';
-          if (url && /^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/i.test(url)) {
-            frame.src = url;
-            frame.style.display = 'block';
-            statusEl.style.display = 'none';
-          } else {
-            msgEl.textContent = '현재 게임 서버가 열려 있지 않습니다. 잠시 후 다시 시도해 주세요!';
-            retryBtn.style.display = 'inline-block';
-          }
-        })
-        .catch(function () {
-          msgEl.textContent = '서버 주소를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요!';
-          retryBtn.style.display = 'inline-block';
-        });
+      applyLang();
+      checkLiveServer();
+      setInterval(checkLiveServer, 8000);
     })();
   </script>
 </body>
