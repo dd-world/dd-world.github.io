@@ -212,7 +212,7 @@
         }
       });
 
-      // CORS 제한에 절대 안 걸리는 이미지 응답 핑으로 서버 생존 여부 즉시 확인!
+      // CORS 제한에 걸리지 않는 이미지 핑으로 서버 생존 여부 즉시 확인
       function pingServerUrl(url, cb) {
         var done = false;
         var img = new Image();
@@ -282,117 +282,6 @@
           .catch(function () {
             if (activeUrl) tryConnectUrl(activeUrl);
             else { isOnline = false; renderBadge(); }
-          });
-      }
-
-      applyLang();
-        };
-      });
-
-      function onOfflineAction() {
-        var d = I[lang];
-        if (isOnline === true && activeUrl) {
-          frame.src = activeUrl;
-          frame.style.display = 'block';
-          shell.style.display = 'none';
-          return;
-        }
-        errEl.textContent = (isOnline === false) ? d.offMsg : d.chkMsg;
-      }
-      document.getElementById('off-login').onclick = onOfflineAction;
-      document.getElementById('off-create').onclick = onOfflineAction;
-
-      // 자동 로그인 & 언어 설정 영구 저장 브리지
-      window.addEventListener('message', function (ev) {
-        var data = ev.data || {};
-        if (data.type === 'dd_request_storage') {
-          try {
-            frame.contentWindow.postMessage({
-              type: 'dd_storage_data',
-              autoLogin: localStorage.getItem('dd_auto_login_v1'),
-              lang: localStorage.getItem('dd_lang')
-            }, '*');
-          } catch (e) {}
-        } else if (data.type === 'dd_save_storage') {
-          try {
-            if (data.autoLogin === null) localStorage.removeItem('dd_auto_login_v1');
-            else if (typeof data.autoLogin === 'string') localStorage.setItem('dd_auto_login_v1', data.autoLogin);
-            if (typeof data.lang === 'string') localStorage.setItem('dd_lang', data.lang);
-          } catch (e) {}
-        }
-      });
-
-      // CORS 제한에 절대 안 걸리는 이미지 응답 핑으로 서버 생존 여부 즉시 확인!
-      function pingServerUrl(url, cb) {
-        var done = false;
-        var img = new Image();
-        var timer = setTimeout(function () {
-          if (done) return;
-          done = true;
-          cb(false);
-        }, 3500);
-        img.onload = function () {
-          if (done) return;
-          done = true;
-          clearTimeout(timer);
-          cb(true);
-        };
-        img.onerror = function () {
-          if (done) return;
-          done = true;
-          clearTimeout(timer);
-          cb(false);
-        };
-        img.src = url + '/assets/gold_coin.png?ping=' + Date.now();
-      }
-
-      var cachedOwner = localStorage.getItem('dd_gist_owner_' + GIST_ID) || '';
-
-      function handleUrlText(rawText) {
-        var url = String(rawText || '').trim();
-        if (!url || !/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/i.test(url)) {
-          isOnline = false; activeUrl = ''; renderBadge();
-          return;
-        }
-        pingServerUrl(url, function (ok) {
-          if (ok) {
-            isOnline = true;
-            activeUrl = url;
-            renderBadge();
-            errEl.textContent = '';
-            frame.src = url;
-            frame.style.display = 'block';
-            shell.style.display = 'none';
-          } else {
-            isOnline = false; activeUrl = ''; renderBadge();
-          }
-        });
-      }
-
-      // 최초 1회만 GitHub API로 Gist 소유자 아이디를 자동 파악해 저장한 뒤,
-      // 이후 5초마다 시간당 60회 제한이 없는 gist.githubusercontent.com raw 주소로 무제한 체크!
-      function checkLiveServer() {
-        if (frame.style.display === 'block') return;
-        if (cachedOwner) {
-          var rawUrl = 'https://gist.githubusercontent.com/' + encodeURIComponent(cachedOwner) + '/' + encodeURIComponent(GIST_ID) + '/raw/url.txt?t=' + Date.now();
-          fetch(rawUrl, { cache: 'no-store' })
-            .then(function (r) { if (!r.ok) throw new Error('raw fail'); return r.text(); })
-            .then(handleUrlText)
-            .catch(function () { isOnline = false; activeUrl = ''; renderBadge(); });
-          return;
-        }
-        fetch('https://api.github.com/gists/' + encodeURIComponent(GIST_ID) + '?t=' + Date.now(), { cache: 'no-store' })
-          .then(function (r) { return r.json(); })
-          .then(function (gist) {
-            if (gist && gist.owner && gist.owner.login) {
-              cachedOwner = gist.owner.login;
-              try { localStorage.setItem('dd_gist_owner_' + GIST_ID, cachedOwner); } catch (e) {}
-            }
-            var file = gist && gist.files && gist.files['url.txt'];
-            handleUrlText(file && file.content ? file.content : '');
-          })
-          .catch(function () {
-            isOnline = false; activeUrl = ''; renderBadge();
           });
       }
 
