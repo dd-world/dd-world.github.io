@@ -107,7 +107,8 @@
   <iframe id="game-frame" allow="fullscreen; autoplay"></iframe>
 
   <script>
-    var GIST_ID = 'c11d893682602dbc956c7b172e95ba95';
+    // 오라클 클라우드 24시간 고정 HTTPS 서버 주소 (Gist·터널 불필요!)
+    var SERVER_URL = 'https://129-225-183-142.sslip.io';
 
     (function () {
       var frame = document.getElementById('game-frame');
@@ -116,9 +117,7 @@
       var srvTxt = document.getElementById('srv-txt');
       var errEl = document.getElementById('off-err');
       var isOnline = null;
-      var activeUrl = '';
-      var apiBlockedUntil = 0;
-      var checkInFlight = false;
+      var checking = false;
 
       var I = {
         ko: {
@@ -126,24 +125,24 @@
           user: '아이디', pass: '비밀번호', auto: '자동 로그인',
           login: '접속하기', create: '✨ 계정 생성',
           chk: '서버 확인 중...', on: '서버 ON', off: '서버 OFF',
-          offMsg: '🔴 현재 서버 OFF 상태라 접속할 수 없습니다. 상태를 다시 확인하는 중...',
-          chkMsg: '⏳ 서버 상태를 확인하고 있습니다. 잠시만 기다려 주세요...'
+          offMsg: '🔴 현재 서버 점검/OFF 상태입니다. 서버 상태를 다시 확인하는 중...',
+          chkMsg: '⏳ 서버에 연결하고 있습니다. 잠시만 기다려 주세요...'
         },
         ja: {
           title: '🐾 ワンワンワールド', sub: 'IDとパスワードを入力してください',
           user: 'ID', pass: 'パスワード', auto: '自動ログイン',
           login: 'ログイン', create: '✨ アカウント作成',
           chk: 'サーバー確認中...', on: 'サーバー ON', off: 'サーバー OFF',
-          offMsg: '🔴 現在サーバーOFF状態のため接続できません。状態を再確認中...',
-          chkMsg: '⏳ サーバー状態を確認しています...'
+          offMsg: '🔴 現在サーバー点検・OFF状態です。再確認中...',
+          chkMsg: '⏳ サーバーに接続しています...'
         },
         en: {
           title: '🐾 DaengDaeng World', sub: 'Enter your ID and password',
           user: 'Username', pass: 'Password', auto: 'Auto Login',
           login: 'Connect', create: '✨ Create Account',
           chk: 'Checking...', on: 'Server ON', off: 'Server OFF',
-          offMsg: '🔴 Server is currently OFF. Re-checking server status...',
-          chkMsg: '⏳ Checking server status...'
+          offMsg: '🔴 Server is currently OFF. Re-checking status...',
+          chkMsg: '⏳ Connecting to server...'
         }
       };
 
@@ -182,17 +181,20 @@
         };
       });
 
-      // 접속하기 / 계정 생성 클릭 시: OFF면 안내 문구 표시 + 즉시 서버 ON/OFF 재동기화!
+      function openGame() {
+        isOnline = true;
+        renderBadge();
+        errEl.textContent = '';
+        frame.src = SERVER_URL;
+        frame.style.display = 'block';
+        shell.style.display = 'none';
+      }
+
       function onOfflineAction() {
         var d = I[lang];
-        if (isOnline === true && activeUrl) {
-          frame.src = activeUrl;
-          frame.style.display = 'block';
-          shell.style.display = 'none';
-          return;
-        }
+        if (isOnline === true) { openGame(); return; }
         errEl.textContent = (isOnline === false) ? d.offMsg : d.chkMsg;
-        checkLiveServer(true);
+        checkServer(true);
       }
       document.getElementById('off-login').onclick = onOfflineAction;
       document.getElementById('off-create').onclick = onOfflineAction;
@@ -217,116 +219,45 @@
         }
       });
 
-      // 이미지 핑 + /api/status 병렬 체크
-      function pingServerUrl(url, cb) {
+      function checkServer(force) {
+        if (frame.style.display === 'block') return;
+        if (checking && !force) return;
+        checking = true;
         var done = false;
-        var failedCount = 0;
+        var fails = 0;
         function finish(ok) {
           if (done) return;
           if (!ok) {
-            failedCount++;
-            if (failedCount < 2) return;
+            fails++;
+            if (fails < 2) return;
           }
           done = true;
+          checking = false;
           clearTimeout(timer);
-          cb(ok);
+          if (ok) openGame();
+          else { isOnline = false; renderBadge(); }
         }
         var timer = setTimeout(function () {
           if (done) return;
           done = true;
-          cb(false);
-        }, 6500);
+          checking = false;
+          isOnline = false;
+          renderBadge();
+        }, 5000);
 
         var img = new Image();
         img.onload = function () { finish(true); };
         img.onerror = function () { finish(false); };
-        img.src = url + '/assets/gold_coin.png?ping=' + Date.now();
+        img.src = SERVER_URL + '/assets/gold_coin.png?ping=' + Date.now();
 
-        fetch(url + '/api/status?t=' + Date.now(), { cache: 'no-store' })
+        fetch(SERVER_URL + '/api/status?t=' + Date.now(), { cache: 'no-store' })
           .then(function (r) { finish(Boolean(r && r.ok)); })
           .catch(function () { finish(false); });
       }
 
-      function tryConnectUrl(url) {
-        if (!url || !/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/i.test(url)) {
-          isOnline = false; activeUrl = ''; checkInFlight = false; renderBadge();
-          return;
-        }
-        pingServerUrl(url, function (ok) {
-          checkInFlight = false;
-          if (ok) {
-            isOnline = true;
-            activeUrl = url;
-            try { localStorage.setItem('dd_last_srv_url', url); } catch (e) {}
-            renderBadge();
-            errEl.textContent = '';
-            frame.src = url;
-            frame.style.display = 'block';
-            shell.style.display = 'none';
-          } else {
-            // 죽은 옛날 주소는 비워서 다음 주기 때 Gist에서 새 주소를 바로 받아오게 함!
-            isOnline = false;
-            activeUrl = '';
-            renderBadge();
-          }
-        });
-      }
-
-      function fetchFromRawGist(now) {
-        var owner = 'anonymous';
-        try { owner = localStorage.getItem('dd_gist_owner_' + GIST_ID) || 'anonymous'; } catch (e) {}
-        var rawUrl = 'https://gist.githubusercontent.com/' + encodeURIComponent(owner) + '/' + encodeURIComponent(GIST_ID) + '/raw/url.txt?t=' + now;
-        return fetch(rawUrl, { cache: 'no-store' })
-          .then(function (r) { if (!r.ok) throw new Error('raw ' + r.status); return r.text(); })
-          .then(function (txt) {
-            var url = String(txt || '').trim();
-            tryConnectUrl(url);
-          })
-          .catch(function () {
-            isOnline = false; activeUrl = ''; checkInFlight = false; renderBadge();
-          });
-      }
-
-      var lastGistFetchAt = 0;
-
-      // OFF 상태일 때는 10초마다 새 터널 주소를 Gist에서 다시 조회 (죽은 옛날 주소에 갇히지 않음!)
-      function checkLiveServer(forceGist) {
-        if (frame.style.display === 'block') return;
-        if (checkInFlight && !forceGist) return;
-        var now = Date.now();
-        if (!forceGist && (now - lastGistFetchAt < 10000)) return;
-        checkInFlight = true;
-        lastGistFetchAt = now;
-
-        if (!forceGist && now < apiBlockedUntil) {
-          fetchFromRawGist(now);
-          return;
-        }
-        fetch('https://api.github.com/gists/' + encodeURIComponent(GIST_ID) + '?t=' + now, { cache: 'no-store' })
-          .then(function (r) {
-            if (r.status === 403 || r.status === 429) {
-              apiBlockedUntil = Date.now() + 2 * 60 * 1000;
-              throw new Error('rate_limit');
-            }
-            if (!r.ok) throw new Error('api ' + r.status);
-            return r.json();
-          })
-          .then(function (gist) {
-            if (gist && gist.owner && gist.owner.login) {
-              try { localStorage.setItem('dd_gist_owner_' + GIST_ID, gist.owner.login); } catch (e) {}
-            }
-            var file = gist && gist.files && gist.files['url.txt'];
-            var url = file && file.content ? file.content.trim() : '';
-            tryConnectUrl(url);
-          })
-          .catch(function () {
-            fetchFromRawGist(now);
-          });
-      }
-
       applyLang();
-      checkLiveServer(true);
-      setInterval(function () { checkLiveServer(false); }, 5000);
+      checkServer(true);
+      setInterval(function () { checkServer(false); }, 5000);
     })();
   </script>
 </body>
