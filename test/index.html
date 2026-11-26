@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>🧪 댕댕 월드 테스트 서버 (DaengDaeng World TEST)</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%; height: 100dvh;
+      overflow: hidden; background: #131c2e;
+      font-family: 'Malgun Gothic', 'Hiragino Sans', 'Meiryo', monospace; color: #3b2314;
+    }
+    #game-frame { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: none; }
+    .overlay {
+      position: fixed; inset: 0; background: rgba(12, 18, 34, 0.82);
+      display: flex; align-items: center; justify-content: center; padding: 12px; z-index: 40;
+    }
+    .card {
+      background: linear-gradient(180deg, #f8fbff 0%, #e0ecff 100%);
+      border: 3px solid #1e3a8a; outline: 2px solid #60a5fa; outline-offset: -5px;
+      border-radius: 8px; padding: 18px; width: 100%; max-width: 430px;
+      box-shadow: 0 6px 0 #172554, 0 10px 24px rgba(0,0,0,0.55);
+      text-align: center; display: flex; flex-direction: column; gap: 9px;
+    }
+    .login-topbar { display: flex; justify-content: space-between; align-items: center; gap: 6px; width: 100%; }
+    .lang-quick { display: flex; gap: 5px; }
+    .lang-chip {
+      border: 2px solid #1e3a8a; background: linear-gradient(180deg, #fff 0%, #dbeafe 100%);
+      color: #1e3a8a; border-radius: 5px; padding: 4px 9px; font-size: 11px; font-weight: 800;
+      cursor: pointer; box-shadow: 0 2px 0 #1e3a8a;
+    }
+    .lang-chip.active { background: linear-gradient(180deg, #93c5fd 0%, #3b82f6 100%); color: #fff; }
+    .server-status-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: #fff; border: 2px solid #1e3a8a; border-radius: 999px;
+      padding: 4px 10px; font-size: 11.5px; font-weight: 900; color: #1e3a8a;
+      box-shadow: 0 2px 0 #1e3a8a; white-space: nowrap;
+    }
+    .srv-dot { width: 10px; height: 10px; border-radius: 50%; background: #9ca3af; border: 1.5px solid #1e3a8a; display: inline-block; }
+    .server-status-badge.online .srv-dot { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+    .server-status-badge.offline .srv-dot { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+    .server-status-badge.online { color: #15803d; }
+    .server-status-badge.offline { color: #dc2626; }
+    .test-pill {
+      display: inline-block; align-self: center;
+      background: #2563eb; color: #fff; font-size: 11px; font-weight: 900;
+      padding: 2px 10px; border-radius: 999px; letter-spacing: 0.5px;
+    }
+    h1 { margin: 0; font-size: 23px; color: #1e3a8a; }
+    .sub { margin: 0; font-size: 13px; color: #334155; font-weight: 700; }
+    .login-form { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+    .login-form input[type="text"], .login-form input[type="password"] {
+      width: 100%; padding: 10px 12px; border: 2px solid #1e3a8a; border-radius: 5px;
+      font-size: 14px; outline: none; background: #fff;
+    }
+    .auto-login-row {
+      display: flex; align-items: center; gap: 7px; justify-content: flex-start;
+      font-size: 13px; font-weight: 800; color: #1e3a8a; cursor: pointer;
+    }
+    .auto-login-row input[type="checkbox"] { width: 17px; height: 17px; accent-color: #2563eb; margin: 0; }
+    .login-btn-row { display: grid; grid-template-columns: 1.35fr 1fr; gap: 8px; width: 100%; }
+    .btn-primary {
+      padding: 12px; border: 2px solid #1e3a8a; border-radius: 6px;
+      background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%);
+      color: #fff; font-size: 16px; font-weight: 900; cursor: pointer;
+      box-shadow: 0 3px 0 #1e3a8a;
+    }
+    .btn-secondary {
+      padding: 12px 8px; border: 2px solid #1e3a8a; border-radius: 6px;
+      background: linear-gradient(180deg, #fff 0%, #dbeafe 100%);
+      color: #1e3a8a; font-size: 14px; font-weight: 900; cursor: pointer;
+      box-shadow: 0 3px 0 #1e3a8a;
+    }
+    .err { color: #dc2626; font-size: 13px; min-height: 18px; font-weight: 800; }
+  </style>
+</head>
+<body>
+  <div id="offline-shell" class="overlay">
+    <div class="card">
+      <div class="login-topbar">
+        <div id="srv-badge" class="server-status-badge">
+          <span class="srv-dot"></span>
+          <span id="srv-txt">테스트 서버 확인 중...</span>
+        </div>
+        <div class="lang-quick">
+          <button type="button" class="lang-chip" data-lang="ko">🇰🇷 한국어</button>
+          <button type="button" class="lang-chip" data-lang="ja">🇯🇵 日本語</button>
+          <button type="button" class="lang-chip" data-lang="en">🇺🇸 English</button>
+        </div>
+      </div>
+      <span class="test-pill">🧪 TEST SERVER</span>
+      <h1 id="t-title">🐾 댕댕 월드 (테스트)</h1>
+      <div class="login-form">
+        <p id="t-sub" class="sub">집 PC에서 start_public_server.bat 실행 시 자동 연결됩니다</p>
+        <input id="off-user" type="text" placeholder="아이디" maxlength="16" />
+        <input id="off-pass" type="password" placeholder="비밀번호" maxlength="20" />
+        <label class="auto-login-row">
+          <input type="checkbox" id="off-auto" />
+          <span id="t-auto">자동 로그인</span>
+        </label>
+        <div class="login-btn-row">
+          <button id="off-login" type="button" class="btn-primary">접속하기</button>
+          <button id="off-create" type="button" class="btn-secondary">✨ 계정 생성</button>
+        </div>
+        <div id="off-err" class="err"></div>
+      </div>
+    </div>
+  </div>
+
+  <iframe id="game-frame" allow="fullscreen; autoplay"></iframe>
+
+  <script>
+    // 기존 PC 터널용 Gist를 테스트 서버 전용으로 재활용!
+    var GIST_ID = 'c11d893682602dbc956c7b172e95ba95';
+
+    (function () {
+      var frame = document.getElementById('game-frame');
+      var shell = document.getElementById('offline-shell');
+      var badge = document.getElementById('srv-badge');
+      var srvTxt = document.getElementById('srv-txt');
+      var errEl = document.getElementById('off-err');
+      var isOnline = null;
+      var activeUrl = '';
+      var apiBlockedUntil = 0;
+      var checkInFlight = false;
+
+      var I = {
+        ko: {
+          title: '🐾 댕댕 월드 (테스트)', sub: 'PC 테스트 서버(start_public_server.bat) 실행 시 자동 연결됩니다',
+          user: '아이디', pass: '비밀번호', auto: '자동 로그인',
+          login: '접속하기', create: '✨ 계정 생성',
+          chk: '테스트 서버 확인 중...', on: '테스트 ON', off: '테스트 OFF',
+          offMsg: '🔴 현재 테스트 서버 OFF 상태입니다. 상태를 다시 확인하는 중...',
+          chkMsg: '⏳ 테스트 서버 상태를 확인하고 있습니다...'
+        },
+        ja: {
+          title: '🐾 ワンワンワールド (TEST)', sub: 'PCテストサーバー起動時に自動接続されます',
+          user: 'ID', pass: 'パスワード', auto: '自動ログイン',
+          login: 'ログイン', create: '✨ アカウント作成',
+          chk: 'テスト確認中...', on: 'テスト ON', off: 'テスト OFF',
+          offMsg: '🔴 現在テストサーバーOFF状態です。再確認中...',
+          chkMsg: '⏳ テストサーバーを確認しています...'
+        },
+        en: {
+          title: '🐾 DaengDaeng World (TEST)', sub: 'Connects automatically when your PC test server is running',
+          user: 'Username', pass: 'Password', auto: 'Auto Login',
+          login: 'Connect', create: '✨ Create Account',
+          chk: 'Checking TEST...', on: 'TEST ON', off: 'TEST OFF',
+          offMsg: '🔴 Test server is OFF. Re-checking status...',
+          chkMsg: '⏳ Checking test server status...'
+        }
+      };
+
+      var lang = 'ko';
+      try { lang = localStorage.getItem('dd_lang') || 'ko'; } catch (e) {}
+      if (!I[lang]) lang = 'ko';
+
+      function applyLang() {
+        var d = I[lang];
+        document.getElementById('t-title').textContent = d.title;
+        document.getElementById('t-sub').textContent = d.sub;
+        document.getElementById('off-user').placeholder = d.user;
+        document.getElementById('off-pass').placeholder = d.pass;
+        document.getElementById('t-auto').textContent = d.auto;
+        document.getElementById('off-login').textContent = d.login;
+        document.getElementById('off-create').textContent = d.create;
+        document.querySelectorAll('.lang-chip').forEach(function (b) {
+          b.classList.toggle('active', b.getAttribute('data-lang') === lang);
+        });
+        renderBadge();
+      }
+
+      function renderBadge() {
+        var d = I[lang];
+        badge.classList.remove('online', 'offline');
+        if (isOnline === true) { badge.classList.add('online'); srvTxt.textContent = d.on; }
+        else if (isOnline === false) { badge.classList.add('offline'); srvTxt.textContent = d.off; }
+        else { srvTxt.textContent = d.chk; }
+      }
+
+      document.querySelectorAll('.lang-chip').forEach(function (b) {
+        b.onclick = function () {
+          lang = b.getAttribute('data-lang') || 'ko';
+          try { localStorage.setItem('dd_lang', lang); } catch (e) {}
+          applyLang();
+        };
+      });
+
+      function onOfflineAction() {
+        var d = I[lang];
+        if (isOnline === true && activeUrl) {
+          frame.src = activeUrl;
+          frame.style.display = 'block';
+          shell.style.display = 'none';
+          return;
+        }
+        errEl.textContent = (isOnline === false) ? d.offMsg : d.chkMsg;
+        checkLiveServer(true);
+      }
+      document.getElementById('off-login').onclick = onOfflineAction;
+      document.getElementById('off-create').onclick = onOfflineAction;
+
+      // 테스트 서버 전용 저장소 키(실서버 자동 로그인과 분리)
+      window.addEventListener('message', function (ev) {
+        var data = ev.data || {};
+        if (data.type === 'dd_request_storage') {
+          try {
+            frame.contentWindow.postMessage({
+              type: 'dd_storage_data',
+              autoLogin: localStorage.getItem('dd_test_auto_login_v1'),
+              lang: localStorage.getItem('dd_lang')
+            }, '*');
+          } catch (e) {}
+        } else if (data.type === 'dd_save_storage') {
+          try {
+            if (data.autoLogin === null) localStorage.removeItem('dd_test_auto_login_v1');
+            else if (typeof data.autoLogin === 'string') localStorage.setItem('dd_test_auto_login_v1', data.autoLogin);
+            if (typeof data.lang === 'string') localStorage.setItem('dd_lang', data.lang);
+          } catch (e) {}
+        }
+      });
+
+      function pingServerUrl(url, cb) {
+        var done = false;
+        var failedCount = 0;
+        function finish(ok) {
+          if (done) return;
+          if (!ok) {
+            failedCount++;
+            if (failedCount < 2) return;
+          }
+          done = true;
+          clearTimeout(timer);
+          cb(ok);
+        }
+        var timer = setTimeout(function () {
+          if (done) return;
+          done = true;
+          cb(false);
+        }, 6500);
+
+        var img = new Image();
+        img.onload = function () { finish(true); };
+        img.onerror = function () { finish(false); };
+        img.src = url + '/assets/gold_coin.png?ping=' + Date.now();
+
+        fetch(url + '/api/status?t=' + Date.now(), { cache: 'no-store' })
+          .then(function (r) { finish(Boolean(r && r.ok)); })
+          .catch(function () { finish(false); });
+      }
+
+      function tryConnectUrl(url) {
+        if (!url || !/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/i.test(url)) {
+          isOnline = false; activeUrl = ''; checkInFlight = false; renderBadge();
+          return;
+        }
+        pingServerUrl(url, function (ok) {
+          checkInFlight = false;
+          if (ok) {
+            isOnline = true;
+            activeUrl = url;
+            renderBadge();
+            errEl.textContent = '';
+            frame.src = url;
+            frame.style.display = 'block';
+            shell.style.display = 'none';
+          } else {
+            isOnline = false; activeUrl = ''; renderBadge();
+          }
+        });
+      }
+
+      function fetchFromRawGist(now) {
+        var owner = 'anonymous';
+        try { owner = localStorage.getItem('dd_gist_owner_' + GIST_ID) || 'anonymous'; } catch (e) {}
+        var rawUrl = 'https://gist.githubusercontent.com/' + encodeURIComponent(owner) + '/' + encodeURIComponent(GIST_ID) + '/raw/url.txt?t=' + now;
+        return fetch(rawUrl, { cache: 'no-store' })
+          .then(function (r) { if (!r.ok) throw new Error('raw ' + r.status); return r.text(); })
+          .then(function (txt) { tryConnectUrl(String(txt || '').trim()); })
+          .catch(function () { isOnline = false; activeUrl = ''; checkInFlight = false; renderBadge(); });
+      }
+
+      var lastGistFetchAt = 0;
+
+      function checkLiveServer(forceGist) {
+        if (frame.style.display === 'block') return;
+        if (checkInFlight && !forceGist) return;
+        var now = Date.now();
+        if (!forceGist && (now - lastGistFetchAt < 10000)) return;
+        checkInFlight = true;
+        lastGistFetchAt = now;
+
+        if (!forceGist && now < apiBlockedUntil) {
+          fetchFromRawGist(now);
+          return;
+        }
+        fetch('https://api.github.com/gists/' + encodeURIComponent(GIST_ID) + '?t=' + now, { cache: 'no-store' })
+          .then(function (r) {
+            if (r.status === 403 || r.status === 429) {
+              apiBlockedUntil = Date.now() + 2 * 60 * 1000;
+              throw new Error('rate_limit');
+            }
+            if (!r.ok) throw new Error('api ' + r.status);
+            return r.json();
+          })
+          .then(function (gist) {
+            if (gist && gist.owner && gist.owner.login) {
+              try { localStorage.setItem('dd_gist_owner_' + GIST_ID, gist.owner.login); } catch (e) {}
+            }
+            var file = gist && gist.files && gist.files['url.txt'];
+            tryConnectUrl(file && file.content ? file.content.trim() : '');
+          })
+          .catch(function () { fetchFromRawGist(now); });
+      }
+
+      applyLang();
+      checkLiveServer(true);
+      setInterval(function () { checkLiveServer(false); }, 5000);
+    })();
+  </script>
+</body>
+</html>
